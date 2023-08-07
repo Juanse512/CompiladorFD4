@@ -1,0 +1,3 @@
+let mul = fix (mult: Nat -> Nat -> Nat) (x: Nat) -> fun (y:Nat) -> ifz y then 0 else x + (mult x (y -1))
+
+let res = print "res = " (mul 3 2)
