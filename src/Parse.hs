@@ -169,21 +169,6 @@ fix = do i <- getPos
          t <- expr
          return (SFix i (f,fty) vars t)
 
-letfun :: P STerm
-letfun = do 
-  i <- getPos
-  reserved "let"
-  vf <- var
-  (v,ty) <- parens binding
-  reservedOp ":"
-  tyf <- typeP
-  reservedOp "="
-  def <- expr
-  reserved "in"
-  body <- expr
-  -- return (SLet i (vf, tyf) (SLam i (v,ty) body) def)
-  return (SLet i (vf, tyf) (SLam i [(v,ty)] def) body)
-
 letpar :: P STerm
 letpar = do
   i <- getPos
@@ -204,15 +189,21 @@ letnoparVar = do
   def <- expr
   return (v, ty, def)
 
+getVarsTypes :: [(Name, Ty)] -> Ty -> Ty
+getVarsTypes [] tyf = NatTy -- 
+getVarsTypes [(v,ty)] tyf = FunTy ty tyf
+getVarsTypes ((v,ty):vs) tyf = FunTy ty (getVarsTypes vs tyf)
+
 letnoparFun :: P (Name, Ty, STerm)
 letnoparFun = do
   vf <- var
-  (v,ty) <- parens binding
+  vars <- binders
   reservedOp ":"
   tyf <- typeP
   reservedOp "="
   def <- expr
-  return (vf, (FunTy ty tyf), SLam NoPos [(v,ty)] def)
+  let ty = getVarsTypes vars tyf
+  return (vf, ty, SLam NoPos vars def)
 
 letnopar :: P STerm
 letnopar = do
@@ -226,7 +217,7 @@ letnopar = do
 letexp :: P STerm
 letexp = do
   i <- getPos
-  try letpar <|> letnopar <|> letfun
+  try letpar <|> letnopar
 
 -- | Parser de términos
 tm :: P STerm
