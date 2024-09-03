@@ -163,10 +163,11 @@ fix :: P STerm
 fix = do i <- getPos
          reserved "fix"
          (f, fty) <- parens binding
-         (x, xty) <- parens binding
+        --  (x, xty) <- parens binding
+         vars <- binders
          reservedOp "->"
          t <- expr
-         return (SFix i (f,fty) (x,xty) t)
+         return (SFix i (f,fty) vars t)
 
 letfun :: P STerm
 letfun = do 

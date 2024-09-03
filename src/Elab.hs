@@ -32,7 +32,8 @@ elab' _ (SConst p c) = Const p c
 elab' env (SLam p [(v,ty)] t) = Lam p v ty (close v (elab' (v:env) t))
 elab' env (SLam p ((v,ty):vs) t) = Lam p v ty (close v (elab' (v:env) (SLam p vs t)))
 -- elab' env (SLam p (v,ty) t) = Lam p v ty (close v (elab' (v:env) t))
-elab' env (SFix p (f,fty) (x,xty) t) = Fix p f fty x xty (close2 f x (elab' (x:f:env) t))
+elab' env (SFix p (f,fty) ((x,xty):xs) t) = Fix p f fty x xty (close2 f x (elab' (x:f:env) (SLam p xs t)))
+-- elab' env (SFix p (f,fty) (x,xty) t) = Fix p f fty x xty (close2 f x (elab' (x:f:env) t))
 elab' env (SIfZ p c t e)         = IfZ p (elab' env c) (elab' env t) (elab' env e)
 -- Operadores binarios
 elab' env (SBinaryOp i o t u) = BinaryOp i o (elab' env t) (elab' env u)
