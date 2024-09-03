@@ -127,6 +127,9 @@ binding = do v <- var
              ty <- typeP
              return (v, ty)
 
+binders :: P [(Name, Ty)]
+binders = many binding
+
 lam :: P STerm
 lam = do i <- getPos
          reserved "fun"
@@ -161,8 +164,23 @@ fix = do i <- getPos
          t <- expr
          return (SFix i (f,fty) (x,xty) t)
 
-letexp :: P STerm
-letexp = do
+letfun :: P STerm
+letfun = do 
+  i <- getPos
+  reserved "let"
+  vf <- var
+  (v,ty) <- parens binding
+  reservedOp ":"
+  tyf <- typeP
+  reservedOp "="
+  def <- expr
+  reserved "in"
+  body <- expr
+  -- return (SLet i (vf, tyf) (SLam i (v,ty) body) def)
+  return (SLet i (vf, tyf) (SLam i (v,ty) def) body)
+
+letpar :: P STerm
+letpar = do
   i <- getPos
   reserved "let"
   (v,ty) <- parens binding
@@ -171,6 +189,39 @@ letexp = do
   reserved "in"
   body <- expr
   return (SLet i (v,ty) def body)
+
+letnoparVar :: P (Name, Ty, STerm)
+letnoparVar = do
+  v <- var
+  reservedOp ":"
+  ty <- typeP
+  reservedOp "="
+  def <- expr
+  return (v, ty, def)
+
+letnoparFun :: P (Name, Ty, STerm)
+letnoparFun = do
+  vf <- var
+  (v,ty) <- parens binding
+  reservedOp ":"
+  tyf <- typeP
+  reservedOp "="
+  def <- expr
+  return (vf, (FunTy ty tyf), SLam NoPos (v,ty) def)
+
+letnopar :: P STerm
+letnopar = do
+  i <- getPos
+  reserved "let"
+  (v,ty,def) <- try letnoparVar <|> letnoparFun
+  reserved "in"
+  body <- expr
+  return (SLet i (v,ty) def body)
+
+letexp :: P STerm
+letexp = do
+  i <- getPos
+  try letpar <|> letnopar <|> letfun
 
 -- | Parser de términos
 tm :: P STerm
