@@ -127,16 +127,20 @@ binding = do v <- var
              ty <- typeP
              return (v, ty)
 
+parensBinding :: P (Name, Ty)
+parensBinding = parens binding
+
 binders :: P [(Name, Ty)]
-binders = many binding
+binders = many parensBinding
 
 lam :: P STerm
 lam = do i <- getPos
          reserved "fun"
-         (v,ty) <- parens binding
+         vars <- binders
+        --  (v,ty) <- parens binding
          reservedOp "->"
          t <- expr
-         return (SLam i (v,ty) t)
+         return (SLam i vars t)
 
 -- Nota el parser app también parsea un solo atom.
 app :: P STerm
@@ -177,7 +181,7 @@ letfun = do
   reserved "in"
   body <- expr
   -- return (SLet i (vf, tyf) (SLam i (v,ty) body) def)
-  return (SLet i (vf, tyf) (SLam i (v,ty) def) body)
+  return (SLet i (vf, tyf) (SLam i [(v,ty)] def) body)
 
 letpar :: P STerm
 letpar = do
@@ -207,7 +211,7 @@ letnoparFun = do
   tyf <- typeP
   reservedOp "="
   def <- expr
-  return (vf, (FunTy ty tyf), SLam NoPos (v,ty) def)
+  return (vf, (FunTy ty tyf), SLam NoPos [(v,ty)] def)
 
 letnopar :: P STerm
 letnopar = do
