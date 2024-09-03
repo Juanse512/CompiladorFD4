@@ -163,7 +163,6 @@ fix :: P STerm
 fix = do i <- getPos
          reserved "fix"
          (f, fty) <- parens binding
-        --  (x, xty) <- parens binding
          vars <- binders
          reservedOp "->"
          t <- expr
@@ -205,18 +204,45 @@ letnoparFun = do
   let ty = getVarsTypes vars tyf
   return (vf, ty, SLam NoPos vars def)
 
+letnoparrec :: P (Name, Ty, STerm)
+letnoparrec = do
+  i <- getPos
+  reserved "rec"
+  v <- var
+  vars <- binders
+  reservedOp ":"
+  ty <- typeP
+  reservedOp "="
+  def <- expr
+  let tyf = getVarsTypes vars ty
+  return (v, tyf, SFix NoPos (v,tyf) vars def)
+
 letnopar :: P STerm
 letnopar = do
   i <- getPos
   reserved "let"
-  (v,ty,def) <- try letnoparVar <|> letnoparFun
+  (v,ty,def) <- try letnoparVar <|> letnoparFun <|> letnoparrec
   reserved "in"
   body <- expr
   return (SLet i (v,ty) def body)
 
+-- letrec :: P STerm
+-- letrec = do
+--   i <- getPos
+--   reserved "let"
+--   reserved "rec"
+--   v <- var
+--   vars <- binders
+--   reservedOp ":"
+--   ty <- typeP
+--   reservedOp "="
+--   def <- expr
+--   reserved "in"
+--   body <- expr
+--   return (SLet i (v,ty) (SFix NoPos (v,ty) vars def) body)
+
 letexp :: P STerm
 letexp = do
-  i <- getPos
   try letpar <|> letnopar
 
 -- | Parser de términos
