@@ -221,7 +221,7 @@ letnopar :: P STerm
 letnopar = do
   i <- getPos
   reserved "let"
-  (v,ty,def) <- try letnoparVar <|> letnoparFun <|> letnoparrec
+  (v,ty,def) <- try letnoparVar <|> try letnoparFun <|> try letnoparrec
   reserved "in"
   body <- expr
   return (SLet i (v,ty) def body)
@@ -238,10 +238,10 @@ tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
 declfun :: P (Name, Ty, STerm)
 declfun = do
   v <- var
-  -- reservedOp ":"
-  -- ty <- typeP
-  let ty = NatTy
+  -- let ty = NatTy
   vars <- binders
+  reservedOp ":"
+  ty <- typeP
   reservedOp "="
   t <- expr
   return (v, getVarsTypes vars ty, SLam NoPos vars t)
@@ -250,9 +250,9 @@ declfun = do
 declvar :: P (Name, Ty, STerm)
 declvar = do
   v <- var
-  -- reservedOp ":"
-  -- ty <- typeP
-  let ty = NatTy
+  reservedOp ":"
+  ty <- typeP
+  -- let ty = NatTy
   reservedOp "="
   t <- expr
   return (v, ty, t)
@@ -262,9 +262,9 @@ declrec = do
   reserved "rec"
   v <- var
   vars <- binders
-  -- reservedOp ":"
-  -- ty <- typeP
-  let ty = NatTy
+  reservedOp ":"
+  ty <- typeP
+  -- let ty = NatTy
   reservedOp "="
   t <- expr
   let tyf = getVarsTypes vars ty
@@ -275,7 +275,7 @@ decl :: P (Decl STerm)
 decl = do 
     i <- getPos
     reserved "let"
-    (v, ty, t) <- try declfun <|> declvar <|> declrec
+    (v, ty, t) <- try declvar <|> try declfun <|> try declrec
     return (Decl i v t)
      
 
@@ -283,15 +283,21 @@ decl = do
 program :: P [Decl STerm]
 program = many decl
 
+
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
 declOrTm :: P (Either (Decl STerm) STerm)
-declOrTm =  try (Left <$> decl) <|> (Right <$> expr)
+declOrTm =  try (Right <$> expr) <|> (Left <$> decl)
+-- Esto originalmente estaba como try (Left <$> decl) <|> (Right <$> expr) 
+-- pero no funcionaba con let f (x: Nat) (y: Nat) : Nat = (x + y) in f 3 2
+-- probar bien que no explote con otra cosa
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada
 runP :: P a -> String -> String -> Either ParseError a
 runP p s filename = runParser (whiteSpace *> p <* eof) () filename s
-
+-- let f (x: Nat) (y: Nat) : Nat = (x + y) in f 3 2 se rompe, no se puede parsear
+-- parece que se soluciono
+-- let (x:Nat) = 3 rompe el tipo - creo que ya esta
 --para debugging en uso interactivo (ghci)
 parse :: String -> STerm
 parse s = case runP expr s "" of
