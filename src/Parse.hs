@@ -226,20 +226,6 @@ letnopar = do
   body <- expr
   return (SLet i (v,ty) def body)
 
--- letrec :: P STerm
--- letrec = do
---   i <- getPos
---   reserved "let"
---   reserved "rec"
---   v <- var
---   vars <- binders
---   reservedOp ":"
---   ty <- typeP
---   reservedOp "="
---   def <- expr
---   reserved "in"
---   body <- expr
---   return (SLet i (v,ty) (SFix NoPos (v,ty) vars def) body)
 
 letexp :: P STerm
 letexp = do
@@ -249,15 +235,49 @@ letexp = do
 tm :: P STerm
 tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
 
+declfun :: P (Name, Ty, STerm)
+declfun = do
+  v <- var
+  -- reservedOp ":"
+  -- ty <- typeP
+  let ty = NatTy
+  vars <- binders
+  reservedOp "="
+  t <- expr
+  return (v, getVarsTypes vars ty, SLam NoPos vars t)
+  -- return (head vars, getVarsTypes (tail vars) ty, SLam NoPos vars t)
+
+declvar :: P (Name, Ty, STerm)
+declvar = do
+  v <- var
+  -- reservedOp ":"
+  -- ty <- typeP
+  let ty = NatTy
+  reservedOp "="
+  t <- expr
+  return (v, ty, t)
+
+declrec :: P (Name, Ty, STerm)
+declrec = do
+  reserved "rec"
+  v <- var
+  vars <- binders
+  -- reservedOp ":"
+  -- ty <- typeP
+  let ty = NatTy
+  reservedOp "="
+  t <- expr
+  let tyf = getVarsTypes vars ty
+  return (v, tyf, SFix NoPos (v,tyf) vars t)
+
 -- | Parser de declaraciones
 decl :: P (Decl STerm)
 decl = do 
-     i <- getPos
-     reserved "let"
-     v <- var
-     reservedOp "="
-     t <- expr
-     return (Decl i v t)
+    i <- getPos
+    reserved "let"
+    (v, ty, t) <- try declfun <|> declvar <|> declrec
+    return (Decl i v t)
+     
 
 -- | Parser de programas (listas de declaraciones) 
 program :: P [Decl STerm]

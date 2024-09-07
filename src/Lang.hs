@@ -56,6 +56,7 @@ data BinaryOp = Add | Sub
 data Decl a = Decl
   { declPos  :: Pos
   , declName :: Name
+  -- , declType :: Ty
   , declBody :: a
   }
   deriving (Show, Functor)
