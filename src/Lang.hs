@@ -23,11 +23,14 @@ module Lang where
 import           Common                         ( Pos )
 import           Data.List.Extra                ( nubSort )
 
+data LetType = LVar | LFun | LRec
+  deriving Show
+
 -- | AST the términos superficiales
 data STm info ty var =
     SV info var
   | SConst info Const
-  | SLam info [(var, ty)] (STm info ty var)
+  | SLam info LetType [(var, ty)] (STm info ty var)
   | SApp info (STm info ty var) (STm info ty var)
   | SPrint info String (STm info ty var)
   | SBinaryOp info BinaryOp (STm info ty var) (STm info ty var)
