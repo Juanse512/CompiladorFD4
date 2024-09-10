@@ -120,6 +120,11 @@ atom =     (flip SConst <$> const <*> getPos)
        <|> parens expr
        <|> printOp
 
+getVarsTypes :: [(Name, Ty)] -> Ty -> Ty
+getVarsTypes [] tyf = NatTy -- 
+getVarsTypes [(v,ty)] tyf = FunTy ty tyf
+getVarsTypes ((v,ty):vs) tyf = FunTy ty (getVarsTypes vs tyf)
+
 -- parsea un par (variable : tipo)
 binding :: P (Name, Ty)
 binding = do v <- var
@@ -177,35 +182,30 @@ letpar = do
   def <- expr
   reserved "in"
   body <- expr
-  return (SLet i (v,ty) def body)
+  return (SLet i LVar [(v,ty)] def body)
 
-letnoparVar :: P (Name, Ty, STerm)
-letnoparVar = do
+letVar :: P ([(Name, Ty)], STerm, LetType)
+letVar = do
   v <- var
   reservedOp ":"
   ty <- typeP
   reservedOp "="
   def <- expr
-  return (v, ty, def)
+  return ([(v, ty)], def, LVar)
 
-getVarsTypes :: [(Name, Ty)] -> Ty -> Ty
-getVarsTypes [] tyf = NatTy -- 
-getVarsTypes [(v,ty)] tyf = FunTy ty tyf
-getVarsTypes ((v,ty):vs) tyf = FunTy ty (getVarsTypes vs tyf)
-
-letnoparFun :: P (Name, Ty, STerm)
-letnoparFun = do
-  vf <- var
+letFun :: P ([(Name, Ty)], STerm, LetType)
+letFun = do
+  v <- var
   vars <- binders
   reservedOp ":"
-  tyf <- typeP
+  ty <- typeP
   reservedOp "="
   def <- expr
-  let ty = getVarsTypes vars tyf
-  return (vf, ty, SLam NoPos vars def)
+  return ((v,ty):vars, def, LFun)
+  -- return ((v,ty):vars, SLam NoPos vars def, LFun)
 
-letnoparrec :: P (Name, Ty, STerm)
-letnoparrec = do
+letRec :: P ([(Name, Ty)], STerm, LetType)
+letRec = do
   i <- getPos
   reserved "rec"
   v <- var
@@ -214,17 +214,20 @@ letnoparrec = do
   ty <- typeP
   reservedOp "="
   def <- expr
-  let tyf = getVarsTypes vars ty
-  return (v, tyf, SFix NoPos (v,tyf) vars def)
+  return ((v,ty):vars, def, LRec)
+  -- return ((v,ty):vars, SFix NoPos (v,tyf) vars def, LRec)
+
+-- letVar: nombre de variable, [], tipo, definicion y tipo de let
+-- letFun: nombre de funcion, tipo, variables de funcion, definicion, tipo de let
 
 letnopar :: P STerm
 letnopar = do
   i <- getPos
   reserved "let"
-  (v,ty,def) <- try letnoparVar <|> try letnoparFun <|> try letnoparrec
+  (vars,def, lt) <- try letVar <|> try letFun <|> try letRec
   reserved "in"
   body <- expr
-  return (SLet i (v,ty) def body)
+  return (SLet i lt vars def body)
 
 
 letexp :: P STerm
@@ -235,7 +238,7 @@ letexp = do
 tm :: P STerm
 tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
 
-declfun :: P (Name, Ty, STerm)
+declfun :: P ([(Name, Ty)], STerm, LetType)
 declfun = do
   v <- var
   -- let ty = NatTy
@@ -244,10 +247,10 @@ declfun = do
   ty <- typeP
   reservedOp "="
   t <- expr
-  return (v, getVarsTypes vars ty, SLam NoPos vars t)
+  return ((v, ty):vars, t, LFun)
   -- return (head vars, getVarsTypes (tail vars) ty, SLam NoPos vars t)
 
-declvar :: P (Name, Ty, STerm)
+declvar :: P ([(Name, Ty)], STerm, LetType)
 declvar = do
   v <- var
   reservedOp ":"
@@ -255,9 +258,9 @@ declvar = do
   -- let ty = NatTy
   reservedOp "="
   t <- expr
-  return (v, ty, t)
+  return ([(v, ty)], t, LVar)
 
-declrec :: P (Name, Ty, STerm)
+declrec :: P ([(Name, Ty)], STerm, LetType)
 declrec = do
   reserved "rec"
   v <- var
@@ -267,26 +270,26 @@ declrec = do
   -- let ty = NatTy
   reservedOp "="
   t <- expr
-  let tyf = getVarsTypes vars ty
-  return (v, tyf, SFix NoPos (v,tyf) vars t)
+  return ((v, ty):vars, t, LRec)
 
 -- | Parser de declaraciones
-decl :: P (Decl STerm)
+decl :: P (SDecl STerm)
 decl = do 
     i <- getPos
     reserved "let"
-    (v, ty, t) <- try declvar <|> try declfun <|> try declrec
-    return (Decl i v t)
-     
+    (vars, term, t) <- try declvar <|> try declfun <|> try declrec
+    return (SDecl i vars t term)
+    -- Decl pos f (SFun pos f ty t)
+    -- (SFun pos f ty t) = SDecl pos f ty t LFun
 
 -- | Parser de programas (listas de declaraciones) 
-program :: P [Decl STerm]
+program :: P [SDecl STerm]
 program = many decl
 
 
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
-declOrTm :: P (Either (Decl STerm) STerm)
+declOrTm :: P (Either (SDecl STerm) STerm)
 declOrTm =  try (Right <$> expr) <|> (Left <$> decl)
 -- Esto originalmente estaba como try (Left <$> decl) <|> (Right <$> expr) 
 -- pero no funcionaba con let f (x: Nat) (y: Nat) : Nat = (x + y) in f 3 2

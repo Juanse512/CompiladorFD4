@@ -15,6 +15,13 @@ module Elab ( elab, elabDecl) where
 import Lang
 import Subst
 
+-- Obtiene el tipo de una funcion dada la lista de sus variables y lo que devuelve
+getVarsTypes :: [(Name, Ty)] -> Ty -> Ty
+getVarsTypes [] tyf = NatTy -- 
+getVarsTypes [(v,ty)] tyf = FunTy ty tyf
+getVarsTypes ((v,ty):vs) tyf = FunTy ty (getVarsTypes vs tyf)
+
+
 -- | 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado. 
 elab :: STerm -> Term
@@ -43,8 +50,30 @@ elab' env (SBinaryOp i o t u) = BinaryOp i o (elab' env t) (elab' env u)
 elab' env (SPrint i str t) = Print i str (elab' env t)
 -- Aplicaciones generales
 elab' env (SApp p h a) = App p (elab' env h) (elab' env a)
-elab' env (SLet p (v,vty) def body) =  
+
+elab' env (SLet p LVar [(v,vty)] def body) =  
   Let p v vty (elab' env def) (close v (elab' (v:env) body))
 
-elabDecl :: Decl STerm -> Decl Term
-elabDecl = fmap elab
+elab' env (SLet p LFun ((v,vty):vs) def body) =
+  Let p v (getVarsTypes vs vty) (elab' env (SLam p vs def)) (close v (elab' (v:env) body))
+
+elab' env (SLet p LRec ((v,vty):vs) def body) =
+  let tyf = getVarsTypes vs vty
+  in Let p v tyf (elab' env (SFix p (v, tyf) vs def)) (close v (elab' (v:env) body))
+    
+  
+-- elab' env (SLet p lt (v,vty) def body) =  
+--   Let p v vty (elab' env def) (close v (elab' (v:env) body))
+
+elabDecl :: SDecl STerm -> Decl Term
+elabDecl (SDecl p [(v, ty)] LVar t) = Decl p v (elab t)
+elabDecl (SDecl p ((v, ty):vs) LFun t) = Decl p v (elab (SLam p vs t))
+elabDecl (SDecl p ((v, ty):vs) LRec t) = 
+  let tyf = getVarsTypes vs ty
+  in Decl p v (elab (SFix p (v, tyf) vs t))
+
+-- elabDecl :: Decl STerm -> Decl Term
+-- elabDecl = fmap elab
+
+-- let f (x: X) (x: Y) : Z = x + y <- input
+-- 
