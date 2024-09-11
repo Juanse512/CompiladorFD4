@@ -61,7 +61,8 @@ elab' env (SLet p LRec ((v,vty):vs) def body) =
   let tyf = getVarsTypes vs vty
   in Let p v tyf (elab' env (SFix p (v, tyf) vs def)) (close v (elab' (v:env) body))
     
-  
+-- Nat -> Nat -> Nat
+-- Nat  -> (Nat -> Nat)
 -- elab' env (SLet p lt (v,vty) def body) =  
 --   Let p v vty (elab' env def) (close v (elab' (v:env) body))
 
