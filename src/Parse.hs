@@ -96,13 +96,29 @@ typeP = try (do
 const :: P Const
 const = CNat <$> num
 
-printOp :: P STerm
-printOp = do
+printNoApp :: P STerm
+printNoApp = do
+  i <- getPos
+  reserved "print"
+  str <- option "" stringLiteral
+  return (SLam i [("x", NatTy)] (SPrint i str (SV i "x")))
+
+printApp :: P STerm
+printApp = do
   i <- getPos
   reserved "print"
   str <- option "" stringLiteral
   a <- atom
   return (SPrint i str a)
+
+printOp :: P STerm
+printOp = do
+  -- i <- getPos
+  -- reserved "print"
+  -- str <- option "" stringLiteral
+  -- a <- atom
+  -- return (SPrint i str a)
+  try printApp <|> try printNoApp
 
 binary :: String -> BinaryOp -> Assoc -> Operator String () Identity STerm
 binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
@@ -126,17 +142,27 @@ getVarsTypes [(v,ty)] tyf = FunTy ty tyf
 getVarsTypes ((v,ty):vs) tyf = FunTy ty (getVarsTypes vs tyf)
 
 -- parsea un par (variable : tipo)
-binding :: P (Name, Ty)
-binding = do v <- var
+-- bindingWithType :: P (Name, Ty)
+-- bindingWithType = do v <- var
+--                      reservedOp ":"
+--                      ty <- typeP
+--                      return (v, ty)
+-- bindingWithoutType :: P Name
+
+
+binding :: P [(Name, Ty)]
+binding = do v <- many var
              reservedOp ":"
              ty <- typeP
-             return (v, ty)
+             return (map (\x -> (x,ty)) v)
+            --  return (v, ty)
 
-parensBinding :: P (Name, Ty)
+parensBinding :: P [(Name, Ty)]
 parensBinding = parens binding
 
 binders :: P [(Name, Ty)]
-binders = many parensBinding
+binders = do arrayVars <- many parensBinding
+             return (concat arrayVars)
 
 lam :: P STerm
 lam = do i <- getPos
@@ -167,7 +193,8 @@ ifz = do i <- getPos
 fix :: P STerm
 fix = do i <- getPos
          reserved "fix"
-         (f, fty) <- parens binding
+         fun <- parens binding
+         let (f, fty) = head fun
          vars <- binders
          reservedOp "->"
          t <- expr
@@ -177,7 +204,8 @@ letpar :: P STerm
 letpar = do
   i <- getPos
   reserved "let"
-  (v,ty) <- parens binding
+  vars <- parens binding
+  let (v, ty) = head vars
   reservedOp "="  
   def <- expr
   reserved "in"
