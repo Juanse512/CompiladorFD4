@@ -137,7 +137,7 @@ handleDecl d = do
               printFD4 ("Chequeando tipos de "++f)
               td <- typecheckDecl d
               addDecl td
-              ppterm <- ppDecl td
+              ppterm <- ppDecl d
               printFD4 ppterm
           Eval -> do
               td <- typecheckDecl d
@@ -146,7 +146,6 @@ handleDecl d = do
 
       where
         typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
-        -- typecheckDecl (Decl p x t) = tcDecl (Decl p x (elab t))
         typecheckDecl decl = tcDecl (elabDecl decl)
 
 

@@ -159,5 +159,3 @@ freeVars tm = nubSort $ go tm [] where
   go (Let _ _ _ e (Sc1 t)     ) xs = go e (go t xs)
 
 
--- f x y
--- let ... f x

@@ -45,19 +45,11 @@ prettyFunction :: STerm -> ([(Name, Ty)], STerm)
 prettyFunction (SLam _ x t) = (x, t)
 prettyFunction t = ([], t)
 
--- [(x, Nat), (y, Nat)]
--- Nat -> Nat -> (Nat -> Nat)
 getReturnType :: Ty -> [(Name, Ty)] -> Ty
 getReturnType ty [] = ty
 getReturnType (FunTy ty tyf) ((_,ty'):xs) = getReturnType tyf xs
+getReturnType ty xs = ty
 
-
--- FunTy Nat (FunTy Nat Nat)
--- FunTy Nat Nat 
--- Nat 
--- let f : Nat -> Nat -> Nat =
--- let f (g: Nat) : Nat -> Nat = 
--- let f (g: Nat) (h: Nat) : Nat 
 
 
 -- | 'openAll' convierte términos locally nameless
@@ -77,9 +69,7 @@ openAll gp ns (Lam p x ty t) =
     sterm = openAll gp (x':ns) (open x' t)
     (vars, body) = prettyFunction sterm
   in SLam (gp p) ((x', ty):vars) body
-  -- in SLam (gp p) vars (openAll gp (x':ns) (open x' t))
-  -- where vars = [(x',ty)]
-  -- in SLam (gp p) (x',ty) (openAll gp (x':ns) (open x' t))
+
 openAll gp ns (App p t u) = SApp (gp p) (openAll gp ns t) (openAll gp ns u)
 openAll gp ns (Fix p f fty x xty t) = 
   let 
@@ -88,7 +78,7 @@ openAll gp ns (Fix p f fty x xty t) =
     sterm = openAll gp (f':x':ns) (open2 f' x' t)
     (vars, body) = prettyFunction sterm
   in SFix (gp p) (f',fty) ((x',xty):vars) body
-  -- in SFix (gp p) (f',fty) [(x',xty)] (openAll gp (x:f:ns) (open2 f' x' t))
+
 openAll gp ns (IfZ p c t e) = SIfZ (gp p) (openAll gp ns c) (openAll gp ns t) (openAll gp ns e)
 openAll gp ns (Print p str t) = SPrint (gp p) str (openAll gp ns t)
 openAll gp ns (BinaryOp p op t u) = SBinaryOp (gp p) op (openAll gp ns t) (openAll gp ns u)
@@ -106,11 +96,6 @@ openAll gp ns (Let p v ty m n) =
           let (vars', body) = prettyFunction t
           in SLet (gp p) LRec ((v',(getReturnType ty vars')):vars') body (openAll gp (v':ns) (open v' n))
         _ -> SLet (gp p) LVar [(v',ty)] defOpened (openAll gp (v':ns) (open v' n))
-      -- SLet (gp p) LVar [(v',ty)] (openAll gp ns m) (openAll gp (v':ns) (open v' n))
-
--- openAll gp ns (Let p v ty m n) = 
---     let v'= freshen ns v 
---     in  SLet (gp p) LVar [(v',ty)] (openAll gp ns m) (openAll gp (v':ns) (open v' n))
 
 --Colores
 constColor :: Doc AnsiStyle -> Doc AnsiStyle
@@ -178,12 +163,6 @@ t2doc at (SLam _ vars t) =
       , sep (map binding2doc vars)
       , opColor (pretty "=")
       , nest 2 (t2doc False t)]
--- t2doc at (SLam _ (v,ty) t) =
---   parenIf at $
---   sep [sep [ keywordColor (pretty "fun")
---            , binding2doc (v,ty)
---            , opColor(pretty "->")]
---       , nest 2 (t2doc False t)]
 
 t2doc at t@(SApp _ _ _) =
   let (h, ts) = collectApp t in
@@ -198,14 +177,6 @@ t2doc at (SFix _ (f,fty) vars m) =
             , opColor (pretty "=") ]
       , nest 2 (t2doc False m) ]
 
--- t2doc at (SFix _ (f,fty) (x,xty) m) =
---   parenIf at $
---   sep [ sep [keywordColor (pretty "fix")
---                   , binding2doc (f, fty)
---                   , binding2doc (x, xty)
---                   , opColor (pretty "->") ]
---       , nest 2 (t2doc False m)
---       ]
 t2doc at (SIfZ _ c t e) =
   parenIf at $
   sep [keywordColor (pretty "ifz"), nest 2 (t2doc False c)
@@ -220,7 +191,6 @@ t2doc at (SLet _ LFun ((x, xty):xs) t t') =
   parenIf at $
   sep [
     sep [keywordColor (pretty "let")
-      --  , binding2doc x
        , name2doc x
        , sep (map binding2doc xs)
        , pretty ":"
@@ -235,11 +205,20 @@ t2doc at (SLet _ LRec ((x, xty):xs) t t') =
   sep [
     sep [keywordColor (pretty "let")
        , keywordColor (pretty "rec")
-      --  , binding2doc x
        , name2doc x
        , sep (map binding2doc xs)
        , pretty ":"
        , ty2doc xty
+       , opColor (pretty "=") ]
+  , nest 2 (t2doc False t)
+  , keywordColor (pretty "in")
+  , nest 2 (t2doc False t') ]
+
+t2doc at (SLet _ LRec [] t t') =
+  parenIf at $
+  sep [
+    sep [keywordColor (pretty "let")
+       , keywordColor (pretty "rec")
        , opColor (pretty "=") ]
   , nest 2 (t2doc False t)
   , keywordColor (pretty "in")
@@ -255,15 +234,15 @@ t2doc at (SLet _ LVar (x:xs) t t') =
   , keywordColor (pretty "in")
   , nest 2 (t2doc False t') ]
 
--- t2doc at (SLet _ _ (x:xs) t t') =
---   parenIf at $
---   sep [
---     sep [keywordColor (pretty "let")
---        , binding2doc x
---        , opColor (pretty "=") ]
---   , nest 2 (t2doc False t)
---   , keywordColor (pretty "in")
---   , nest 2 (t2doc False t') ]
+
+t2doc at (SLet _ _ [] t t') =
+  parenIf at $
+  sep [
+    sep [keywordColor (pretty "let")
+       , opColor (pretty "=") ]
+  , nest 2 (t2doc False t)
+  , keywordColor (pretty "in")
+  , nest 2 (t2doc False t') ]
 
 t2doc at (SBinaryOp _ o a b) =
   parenIf at $
@@ -284,13 +263,42 @@ pp t = do
 render :: Doc AnsiStyle -> String
 render = unpack . renderStrict . layoutSmart defaultLayoutOptions
 
--- | Pretty printing de declaraciones
-ppDecl :: MonadFD4 m => Decl TTerm -> m String
-ppDecl (Decl p x t) = do 
+ppDecl :: MonadFD4 m => SDecl STerm -> m String
+ppDecl (SDecl p (x:vars) LVar term) = do 
   gdecl <- gets glb
   return (render $ sep [defColor (pretty "let")
-                       , name2doc x 
+                       , binding2doc x
                        , defColor (pretty "=")] 
-                   <+> nest 2 (t2doc False (openAll fst (map declName gdecl) t)))
-                         
+                   <+> nest 2 (t2doc False term))
 
+
+ppDecl (SDecl p ((x,xty):vars) LFun term) = do 
+  gdecl <- gets glb
+  return (render $ sep [defColor (pretty "let")
+                       , name2doc x
+                       , sep (map binding2doc vars)
+                       , defColor (pretty "=")] 
+                   <+> nest 2 (t2doc False term))
+
+
+ppDecl (SDecl p ((x,xty):vars) LRec term) = do
+  gdecl <- gets glb
+  return (render $ sep [defColor (pretty "let")
+                       , keywordColor (pretty "rec")
+                       , name2doc x
+                       , sep (map binding2doc vars)
+                       , defColor (pretty "=")] 
+                   <+> nest 2 (t2doc False term))
+
+ppDecl (SDecl p [] LRec term) = do
+  gdecl <- gets glb
+  return (render $ sep [defColor (pretty "let")
+                       , keywordColor (pretty "rec")
+                       , defColor (pretty "=")] 
+                   <+> nest 2 (t2doc False term))
+
+ppDecl (SDecl p [] _ term) = do
+  gdecl <- gets glb
+  return (render $ sep [defColor (pretty "let")
+                       , defColor (pretty "=")] 
+                   <+> nest 2 (t2doc False term))
