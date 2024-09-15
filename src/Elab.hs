@@ -37,7 +37,6 @@ elab' env (SV p v) =
 
 elab' _ (SConst p c) = Const p c
 elab' env (SLam p [(v,ty)] t) = Lam p v ty (close v (elab' (v:env) t))
--- elab' env (SLam p ((v,ty):vs) t) = Lam p v ty (close v (elab' (v:env) (SLam p vs t)))
 
 elab' env (SLam p vars t) = let (x,xty) = head vars
                             in Lam p x xty (close x (elab' (x:env) (SLam p (tail vars) t)))
@@ -46,9 +45,6 @@ elab' env (SFix p (f,fty) [(x,xty)] t) = Fix p f fty x xty (close2 f x (elab' (x
 elab' env (SFix p (f,fty) vars t) = let (x,xty) = head vars
                                     in Fix p f fty x xty (close2 f x (elab' (x:f:env) (SLam p (tail vars) t)))
 
--- elab' env (SFix p (f,fty) [(x,xty)] t) = Fix p f fty x xty (close2 f x (elab' (x:f:env) t))
--- elab' env (SFix p (f,fty) ((x,xty):xs) t) = Fix p f fty x xty (close2 f x (elab' (x:f:env) (SLam p xs t)))
--- elab' env (SFix p (f,fty) [] t) = Fix p f fty "" NatTy (elab' (f:env) t)
 elab' env (SIfZ p c t e)         = IfZ p (elab' env c) (elab' env t) (elab' env e)
 -- Operadores binarios
 elab' env (SBinaryOp i o t u) = BinaryOp i o (elab' env t) (elab' env u)
@@ -57,8 +53,6 @@ elab' env (SPrint i str t) = Print i str (elab' env t)
 -- Aplicaciones generales
 elab' env (SApp p h a) = App p (elab' env h) (elab' env a)
 
--- elab' env (SLet p LVar [(v,vty)] def body) =  
---   Let p v vty (elab' env def) (close v (elab' (v:env) body))
 
 elab' env (SLet p LVar vars def body) = let (v,vty) = head vars
                                         in Let p v vty (elab' env def) (close v (elab' (v:env) body))
@@ -69,24 +63,16 @@ elab' env (SLet p LFun vars def body) =
   let (v,vty) = head vars
   in Let p v (getVarsTypes (tail vars) vty) (elab' env (SLam p (tail vars) def)) (close v (elab' (v:env) body))
 
--- elab' env (SLet p LFun ((v,vty):vs) def body) =
---   Let p v (getVarsTypes vs vty) (elab' env (SLam p vs def)) (close v (elab' (v:env) body))
-
--- elab' env (SLet p LRec ((v,vty):vs) def body) =
---   let tyf = getVarsTypes vs vty
---   in Let p v tyf (elab' env (SFix p (v, tyf) vs def)) (close v (elab' (v:env) body))
     
 elab' env (SLet p LRec vars def body) = let (v,vty) = head vars
                                             tyf = getVarsTypes (tail vars) vty
                                         in Let p v tyf (elab' env (SFix p (v, tyf) (tail vars) def)) (close v (elab' (v:env) body))
 
 elabDecl :: SDecl STerm -> Decl Term
--- elabDecl (SDecl p [(v, ty)] LVar t) = Decl p v (elab t)
 elabDecl (SDecl p vars LVar t) = let (v,ty) = head vars
                                  in Decl p v (elab t)
 
 
--- elabDecl (SDecl p ((v, ty):vs) LFun t) = Decl p v (elab (SLam p vs t))
 
 elabDecl (SDecl p vars LFun t) = let (v,ty) = head vars
                                  in Decl p v (elab (SLam p (tail vars) t))
@@ -94,7 +80,3 @@ elabDecl (SDecl p vars LFun t) = let (v,ty) = head vars
 elabDecl (SDecl p vars LRec t) = let (v,ty) = head vars
                                      tyf = getVarsTypes (tail vars) ty
                                  in Decl p v (elab (SFix p (v, tyf) (tail vars) t))
-
--- elabDecl (SDecl p ((v, ty):vs) LRec t) = 
---   let tyf = getVarsTypes vs ty
---   in Decl p v (elab (SFix p (v, tyf) vs t))

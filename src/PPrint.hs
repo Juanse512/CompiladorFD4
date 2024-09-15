@@ -161,8 +161,6 @@ t2doc at (SLam _ vars t) =
   parenIf at $
   sep [ keywordColor (pretty "fun")
       , sep (map binding2doc vars)
-      , pretty ":"
-      , ty2doc (getReturnType NatTy vars)
       , opColor (pretty "=")
       , nest 2 (t2doc False t)]
 
