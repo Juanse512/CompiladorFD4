@@ -161,6 +161,8 @@ t2doc at (SLam _ vars t) =
   parenIf at $
   sep [ keywordColor (pretty "fun")
       , sep (map binding2doc vars)
+      , pretty ":"
+      , ty2doc (getReturnType NatTy vars)
       , opColor (pretty "=")
       , nest 2 (t2doc False t)]
 
@@ -277,6 +279,8 @@ ppDecl (SDecl p ((x,xty):vars) LFun term) = do
   return (render $ sep [defColor (pretty "let")
                        , name2doc x
                        , sep (map binding2doc vars)
+                       , pretty ":"
+                       , ty2doc xty
                        , defColor (pretty "=")] 
                    <+> nest 2 (t2doc False term))
 
@@ -287,6 +291,8 @@ ppDecl (SDecl p ((x,xty):vars) LRec term) = do
                        , keywordColor (pretty "rec")
                        , name2doc x
                        , sep (map binding2doc vars)
+                       , pretty ":"
+                       , ty2doc xty
                        , defColor (pretty "=")] 
                    <+> nest 2 (t2doc False term))
 
