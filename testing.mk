@@ -71,7 +71,7 @@ accept: $(patsubst %,%.accept,$(TESTS))
 
 # Idem CEK
 %.actual_out_cek: % $(EXE)
-	$(Q)$(EXE) $(EXTRAFLAGS) --eval --cek $< > $@
+	$(Q)$(EXE) $(EXTRAFLAGS) --cek $< > $@
 
 %.check_cek: %.out %.actual_out_cek
 	$(Q)diff -u $^
