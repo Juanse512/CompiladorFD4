@@ -29,7 +29,7 @@ import Global
 import Errors
 import Lang
 import Parse ( P, tm, program, declOrTm, runP )
-import Elab ( elab, elabDecl )
+import Elab ( elab, elabDecl, elabTy )
 import Eval ( eval )
 import PPrint ( pp , ppTy, ppDecl )
 import MonadFD4
@@ -95,7 +95,7 @@ repl args = do
                        b <- lift $ catchErrors $ handleCommand c
                        maybe loop (`when` loop) b
 
-loadFile ::  MonadFD4 m => FilePath -> m [SDecl STerm]
+loadFile ::  MonadFD4 m => FilePath -> m [Either (SDecl STerm) (Decl STy)]
 loadFile f = do
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
@@ -124,8 +124,8 @@ evalDecl (Decl p x e) = do
     e' <- eval e
     return (Decl p x e')
 
-handleDecl ::  MonadFD4 m => SDecl STerm -> m ()
-handleDecl d = do
+handleDecl ::  MonadFD4 m => Either (SDecl STerm) (Decl STy) -> m ()
+handleDecl (Left d) = do
         m <- getMode
         case m of
           Interactive -> do
@@ -146,8 +146,24 @@ handleDecl d = do
 
       where
         typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
-        typecheckDecl decl = tcDecl (elabDecl decl)
-
+        typecheckDecl sdecl = do decl <- elabDecl sdecl
+                                 tcDecl decl
+handleDecl (Right d) = do
+        m <- getMode
+        let p = declPos d
+        let n = declName d
+        let sty = declBody d
+        ty <- elabTy sty
+        addType (Decl p n ty)
+        -- case m of
+        --   Interactive -> do
+        --       addType (Decl p n ty)
+        --   Typecheck -> do
+        --       f <- getLastFile
+        --       printFD4 ("Chequeando tipos de "++f)
+        --       addType (Decl p n ty)
+        --   Eval -> do
+        --       addType (Decl p n ty)
 
 data Command = Compile CompileForm
              | PPrint String
@@ -233,7 +249,7 @@ compilePhrase x = do
 
 handleTerm ::  MonadFD4 m => STerm -> m ()
 handleTerm t = do
-         let t' = elab t
+         t' <- elab t
          s <- get
          tt <- tc t' (tyEnv s)
          te <- eval tt
@@ -244,7 +260,7 @@ printPhrase   :: MonadFD4 m => String -> m ()
 printPhrase x =
   do
     x' <- parseIO "<interactive>" tm x
-    let ex = elab x'
+    ex <- elab x'
     tyenv <- gets tyEnv
     tex <- tc ex tyenv
     t  <- case x' of
@@ -258,7 +274,7 @@ printPhrase x =
 typeCheckPhrase :: MonadFD4 m => String -> m ()
 typeCheckPhrase x = do
          t <- parseIO "<interactive>" tm x
-         let t' = elab t
+         t' <- elab t
          s <- get
          tt <- tc t' (tyEnv s)
          let ty = getTy tt

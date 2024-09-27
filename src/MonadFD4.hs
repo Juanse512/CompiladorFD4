@@ -33,6 +33,7 @@ module MonadFD4 (
   failFD4,
   addDecl,
   catchErrors,
+  addType,
   MonadFD4,
   module Control.Monad.Except,
   module Control.Monad.State)
@@ -87,8 +88,22 @@ setLastFile filename = modify (\s -> s {lfile = filename , cantDecl = 0})
 getLastFile :: MonadFD4 m => m FilePath
 getLastFile = gets lfile
 
+getDeclName :: Decl a -> Name
+getDeclName (Decl { declName = nm }) = nm
+
 addDecl :: MonadFD4 m => Decl TTerm -> m ()
-addDecl d = modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
+addDecl d = do 
+            let nm = getDeclName d
+            let term = declBody d
+            s <- get
+            case filter (hasName nm) (types s) of
+                [] -> modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
+                _ -> throwError (ErrType (getPos term) nm)
+            where hasName :: Name -> Decl a -> Bool
+                  hasName nm (Decl { declName = nm' }) = nm == nm'
+
+addType :: MonadFD4 m => Decl Ty -> m ()
+addType d =  modify (\s -> s { types = d : types s})
 
 eraseLastFileDecls :: MonadFD4 m => m ()
 eraseLastFileDecls = do
@@ -105,6 +120,15 @@ lookupDecl nm = do
        [] -> return Nothing
    where hasName :: Name -> Decl a -> Bool
          hasName nm (Decl { declName = nm' }) = nm == nm'
+
+lookupDeclTy :: MonadFD4 m => Name -> m (Maybe Ty)
+lookupDeclTy nm = do
+    s <- get
+    case filter (hasName nm) (types s) of
+        (Decl { declBody=e }):_ -> return (Just e)
+        [] -> return Nothing
+    where hasName :: Name -> Decl a -> Bool
+          hasName nm (Decl { declName = nm' }) = nm == nm'
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
 lookupTy nm = do

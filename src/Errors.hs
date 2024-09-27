@@ -17,7 +17,9 @@ import Text.Parsec.Error ( ParseError )
 data Error =
     ParseErr ParseError
   | ErrPos Pos String
+  | ErrType Pos String
 
 instance Show Error where
   show (ParseErr e) = show e
   show (ErrPos p s) = show p++" "++ s
+  show (ErrType p s) = show p ++ show s ++ " is Type"

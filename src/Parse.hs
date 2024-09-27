@@ -43,7 +43,7 @@ langDef = emptyDef {
 whiteSpace :: P ()
 whiteSpace = Tok.whiteSpace lexer
 
-natural :: P Integer 
+natural :: P Integer
 natural = Tok.natural lexer
 
 stringLiteral :: P String
@@ -81,18 +81,18 @@ getPos :: P Pos
 getPos = do pos <- getPosition
             return $ Pos (sourceLine pos) (sourceColumn pos)
 
-tyatom :: P Ty
-tyatom = (reserved "Nat" >> return NatTy)
+tyatom :: P STy
+tyatom = (identifier >>= \n-> return (STy n))
          <|> parens typeP
 
-typeP :: P Ty
-typeP = try (do 
+typeP :: P STy
+typeP = try (do
           x <- tyatom
           reservedOp "->"
           y <- typeP
-          return (FunTy x y))
+          return (SFunTy x y))
       <|> tyatom
-          
+
 const :: P Const
 const = CNat <$> num
 
@@ -101,7 +101,7 @@ printNoApp = do
   i <- getPos
   reserved "print"
   str <- option "" stringLiteral
-  return (SLam i [("x", NatTy)] (SPrint i str (SV i "x")))
+  return (SLam i [("x", (STy "Nat"))] (SPrint i str (SV i "x")))
 
 printApp :: P STerm
 printApp = do
@@ -136,16 +136,16 @@ getVarsTypes [] tyf = NatTy --
 getVarsTypes [(v,ty)] tyf = FunTy ty tyf
 getVarsTypes ((v,ty):vs) tyf = FunTy ty (getVarsTypes vs tyf)
 
-binding :: P [(Name, Ty)]
+binding :: P [(Name, STy)]
 binding = do v <- many var
              reservedOp ":"
              ty <- typeP
              return (map (\x -> (x,ty)) v)
 
-parensBinding :: P [(Name, Ty)]
+parensBinding :: P [(Name, STy)]
 parensBinding = parens binding
 
-binders :: P [(Name, Ty)]
+binders :: P [(Name, STy)]
 binders = do arrayVars <- many parensBinding
              return (concat arrayVars)
 
@@ -190,13 +190,13 @@ letpar = do
   reserved "let"
   vars <- parens binding
   let (v, ty) = head vars
-  reservedOp "="  
+  reservedOp "="
   def <- expr
   reserved "in"
   body <- expr
   return (SLet i LVar [(v,ty)] def body)
 
-letVar :: P ([(Name, Ty)], STerm, LetType)
+letVar :: P ([(Name, STy)], STerm, LetType)
 letVar = do
   v <- var
   reservedOp ":"
@@ -205,7 +205,7 @@ letVar = do
   def <- expr
   return ([(v, ty)], def, LVar)
 
-letFun :: P ([(Name, Ty)], STerm, LetType)
+letFun :: P ([(Name, STy)], STerm, LetType)
 letFun = do
   v <- var
   vars <- binders
@@ -215,7 +215,7 @@ letFun = do
   def <- expr
   return ((v,ty):vars, def, LFun)
 
-letRec :: P ([(Name, Ty)], STerm, LetType)
+letRec :: P ([(Name, STy)], STerm, LetType)
 letRec = do
   i <- getPos
   reserved "rec"
@@ -245,7 +245,7 @@ letexp = do
 tm :: P STerm
 tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
 
-declfun :: P ([(Name, Ty)], STerm, LetType)
+declfun :: P ([(Name, STy)], STerm, LetType)
 declfun = do
   v <- var
   vars <- binders
@@ -255,7 +255,7 @@ declfun = do
   t <- expr
   return ((v, ty):vars, t, LFun)
 
-declvar :: P ([(Name, Ty)], STerm, LetType)
+declvar :: P ([(Name, STy)], STerm, LetType)
 declvar = do
   v <- var
   reservedOp ":"
@@ -264,7 +264,7 @@ declvar = do
   t <- expr
   return ([(v, ty)], t, LVar)
 
-declrec :: P ([(Name, Ty)], STerm, LetType)
+declrec :: P ([(Name, STy)], STerm, LetType)
 declrec = do
   reserved "rec"
   v <- var
@@ -275,23 +275,34 @@ declrec = do
   t <- expr
   return ((v, ty):vars, t, LRec)
 
+-- type funfun = fun -> fun
+-- type fun =  Nat -> Nat
+typeDecl :: P (Decl STy)
+typeDecl = do
+  i <- getPos
+  reserved "type"
+  ty <- tyIdentifier
+  reservedOp "="
+  tydef <- typeP
+  return Decl {declPos = i, declName = ty, declBody = tydef }
+
 -- | Parser de declaraciones
 decl :: P (SDecl STerm)
-decl = do 
+decl = do
     i <- getPos
     reserved "let"
     (vars, term, t) <- try declvar <|> try declfun <|> try declrec
     return (SDecl i vars t term)
 
 -- | Parser de programas (listas de declaraciones) 
-program :: P [SDecl STerm]
-program = many decl
+program :: P [Either (SDecl STerm) (Decl STy)]
+program = many (try (Left <$> decl) <|> try (Right <$> typeDecl))
 
 
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
-declOrTm :: P (Either (SDecl STerm) STerm)
-declOrTm =  try (Right <$> expr) <|> (Left <$> decl)
+declOrTm :: P (Either (Either (SDecl STerm) (Decl STy)) STerm)
+declOrTm =  try (Right <$> expr) <|> (try (Left . Left <$> decl) <|> (Left . Right <$> typeDecl))
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada
 runP :: P a -> String -> String -> Either ParseError a

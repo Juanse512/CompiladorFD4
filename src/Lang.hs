@@ -22,6 +22,7 @@ module Lang where
 
 import           Common                         ( Pos )
 import           Data.List.Extra                ( nubSort )
+import System.Mem.StableName (StableName)
 
 data LetType = LVar | LFun | LRec
   deriving Show
@@ -42,6 +43,11 @@ data STm info ty var =
   deriving (Show, Functor)
 -- Decl
 -- | AST de Tipos
+
+data STy = STy Name
+    | SFunTy STy STy 
+    deriving (Show,Eq)
+
 data Ty =
       NatTy
     | FunTy Ty Ty
@@ -50,7 +56,7 @@ data Ty =
 
 type Name = String
 
-type STerm = STm Pos Ty Name -- ^ 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición  
+type STerm = STm Pos STy Name -- ^ 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición  
 
 newtype Const = CNat Int
   deriving Show
@@ -68,7 +74,7 @@ data Decl a = Decl
 
 data SDecl a = SDecl
   { sdeclPos  :: Pos
-  , sdeclVars :: [(Name, Ty)]
+  , sdeclVars :: [(Name, STy)]
   , sdeclType :: LetType
   , sdeclBody :: a
   }

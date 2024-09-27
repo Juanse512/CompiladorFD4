@@ -10,14 +10,15 @@ Stability   : experimental
 module Global where
 
 import Lang
-
+import Common ( Pos(NoPos) )
 data GlEnv = GlEnv {
   inter :: Bool,        --  ^ True, si estamos en modo interactivo.
                         -- Este parámetro puede cambiar durante la ejecución:
                         -- Es falso mientras se cargan archivos, pero luego puede ser verdadero.
   lfile :: String,      -- ^ Último archivo cargado.
   cantDecl :: Int,      -- ^ Cantidad de declaraciones desde la última carga
-  glb :: [Decl TTerm]  -- ^ Entorno con declaraciones globales
+  glb :: [Decl TTerm],  -- ^ Entorno con declaraciones globales
+  types :: [Decl Ty]    -- ^ Entorno con declaraciones de tipos
 }
 
 -- ^ Entorno de tipado de declaraciones globales
@@ -38,4 +39,4 @@ data Conf = Conf {
 
 -- | Valor del estado inicial
 initialEnv :: GlEnv
-initialEnv = GlEnv False "" 0 []
+initialEnv = GlEnv False "" 0 [] [Decl {declPos = NoPos, declName = "Nat", declBody = NatTy}]

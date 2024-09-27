@@ -29,7 +29,7 @@ instance Monoid Pos where
 instance Show Pos where
    show (Pos line column) = "("++show line++","++show column++")"
    show NoPos = ""
-
+   show _     = "(Common.NoPos)"
 ---------------------
 -- Utility functions
 --------------------
