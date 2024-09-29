@@ -65,7 +65,7 @@ elab' env (SFix p (f,fsty) [(x,xsty)] st) = do t <- elab' (x:f:env) st
                                                fty <- elabTy fsty
                                                return $ Fix p f fty x xty (close2 f x t)
 elab' env (SFix p (f,fsty) vars st) = do let (x,xsty) = head vars
-                                         t <- elab' (x:f:env) (SFix p (f,fsty) (tail vars) st)
+                                         t <- elab' (x:f:env) (SLam p (tail vars) st)
                                          xty <- elabTy xsty
                                          fty <- elabTy fsty
                                          return $ Fix p f fty x xty (close2 f x t)
