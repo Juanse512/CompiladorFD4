@@ -36,7 +36,7 @@ langDef :: LanguageDef u
 langDef = emptyDef {
          commentLine    = "#",
          reservedNames = ["let", "rec","fun", "fix", "then", "else","in",
-                           "ifz", "print","Nat","type"],
+                           "ifz", "print","type"],
          reservedOpNames = ["->",":","=","+","-"]
         }
 
