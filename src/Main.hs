@@ -48,6 +48,7 @@ parseMode = (,) <$>
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
       <|> flag Eval        Eval        (long "eval" <> short 'e' <> help "Evaluar programa")
       <|> flag InteractiveCEK   InteractiveCEK  (long "interactiveCEK" <> short 'k' <> help "Evaluar programa con la máquina CEK")
+      <|> flag CEK   CEK  (long "cek" <> short 'c' <> help "Evaluar programa con la máquina CEK")
       )
    <*> pure False
 
@@ -66,6 +67,8 @@ main = execParser opts >>= go
     go :: (Mode,Bool,[FilePath]) -> IO ()
     go (Interactive,opt,files) =
               runOrFail (Conf opt Interactive) (runInputT defaultSettings (repl files))
+    go (InteractiveCEK,opt,files) =
+              runOrFail (Conf opt InteractiveCEK) (runInputT defaultSettings (repl files))
     go (m,opt, files) =
               runOrFail (Conf opt m) $ mapM_ compileFile files
 
@@ -126,6 +129,12 @@ evalDecl (Decl p x e) = do
     e' <- eval e
     return (Decl p x e')
 
+evalDeclCEK :: MonadFD4 m => Decl TTerm -> m (Decl TTerm)
+evalDeclCEK (Decl p x e) = do
+    e' <- evalCEK e
+    return (Decl p x e')
+
+
 handleDecl ::  MonadFD4 m => Either (SDecl STerm) (Decl STy) -> m ()
 handleDecl (Left d) = do
         m <- getMode
@@ -145,6 +154,10 @@ handleDecl (Left d) = do
               td <- typecheckDecl d
               ed <- evalDecl td
               addDecl ed
+          CEK -> do
+              td <- typecheckDecl d
+              te <- evalDeclCEK td
+              addDecl te
           InteractiveCEK -> do
               (Decl p x tt) <- typecheckDecl d
               te <- evalCEK tt
