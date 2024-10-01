@@ -33,6 +33,7 @@ import Elab ( elab, elabDecl, elabTy )
 import Eval ( eval )
 import PPrint ( pp , ppTy, ppDecl )
 import MonadFD4
+import CEK ( evalCEK )
 import TypeChecker ( tc, tcDecl )
 
 prompt :: String
@@ -46,6 +47,7 @@ parseMode = (,) <$>
       (flag' Typecheck ( long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
       <|> flag Eval        Eval        (long "eval" <> short 'e' <> help "Evaluar programa")
+      <|> flag InteractiveCEK   InteractiveCEK  (long "interactiveCEK" <> short 'k' <> help "Evaluar programa con la máquina CEK")
       )
    <*> pure False
 
@@ -143,6 +145,10 @@ handleDecl (Left d) = do
               td <- typecheckDecl d
               ed <- evalDecl td
               addDecl ed
+          InteractiveCEK -> do
+              (Decl p x tt) <- typecheckDecl d
+              te <- evalCEK tt
+              addDecl (Decl p x te)
 
       where
         typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
