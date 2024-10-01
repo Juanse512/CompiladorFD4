@@ -14,20 +14,25 @@ module Elab ( elab, elabDecl, elabTy) where
 
 import Lang
 import Subst
-import MonadFD4 ( MonadFD4, lookupTy )
+import MonadFD4 ( MonadFD4, lookupDeclTy )
 import Data.Data (tyConFingerprint)
 -- Obtiene el tipo de una funcion dada la lista de sus variables y lo que devuelve
+-- getVarsTypes :: [(Name, Ty)] -> Ty -> Ty
+-- getVarsTypes [] tyf = NatTy --
+-- getVarsTypes [(v,ty)] tyf = FunTy ty tyf
+-- getVarsTypes ((v,ty):vs) tyf = FunTy ty (getVarsTypes vs tyf)
+-- Obtiene el tipo de una funcion dada la lista de sus variables y lo que devuelve
 getVarsTypes :: [(Name, STy)] -> STy -> STy
-getVarsTypes [] tyf = tyf -- 
+getVarsTypes [] tyf = STy "Nat" -- 
 getVarsTypes [(v,ty)] tyf = SFunTy ty tyf
 getVarsTypes ((v,ty):vs) tyf = SFunTy ty (getVarsTypes vs tyf)
-
+-- getVarsTypes ((v,ty):vs) tyf = SFunTy (getVarsTypes vs tyf) ty 
 
 
 -- | 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado. 
 elabTy :: MonadFD4 m => STy -> m Ty
-elabTy (STy n) = do x <- lookupTy n
+elabTy (STy n) = do x <- lookupDeclTy n
                     case x of
                       Just ty -> return ty
                       Nothing -> error $ "No se encontró el tipo " ++ n
@@ -60,7 +65,7 @@ elab' env (SFix p (f,fsty) [(x,xsty)] st) = do t <- elab' (x:f:env) st
                                                fty <- elabTy fsty
                                                return $ Fix p f fty x xty (close2 f x t)
 elab' env (SFix p (f,fsty) vars st) = do let (x,xsty) = head vars
-                                         t <- elab' (x:f:env) (SFix p (f,fsty) (tail vars) st)
+                                         t <- elab' (x:f:env) (SLam p (tail vars) st)
                                          xty <- elabTy xsty
                                          fty <- elabTy fsty
                                          return $ Fix p f fty x xty (close2 f x t)
