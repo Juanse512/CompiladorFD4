@@ -74,20 +74,6 @@ destroy v (KLet p t : k) = search t (v : p) k
 destroy v [] = return v
 destroy _ _ = undefined
 
--- [1, 2]
--- Bound 0 + Bound 1
--- 1 + Bound 0
--- [2]
--- 1 + 2
--- []
-
--- valToTTerm :: Val -> TTerm
--- valToTTerm (VN n) = Const (NoPos, NatTy) (CNat n)
--- valToTTerm (VClos (ClosFun i [] x ty t)) = Lam i x ty (Sc1 t)
--- valToTTerm (VClos (ClosFun i p x ty t)) = valToTTerm (VClos (ClosFun i (tail p) x ty (subst (valToTTerm (head p)) (Sc1 t))))
--- valToTTerm (VClos (ClosFix i [] x1 t1 x2 t2 t)) = Fix i x1 t1 x2 t2 (Sc2 t)
--- valToTTerm (VClos (ClosFix i p x1 t1 x2 t2 t)) = valToTTerm (VClos (ClosFix i (tail (tail p)) x1 t1 x2 t2 (subst2 (valToTTerm (head p)) (valToTTerm (head (tail p))) (Sc2 t)) ))
-
 valToTTerm :: Val -> TTerm
 valToTTerm (VN c) = Const (NoPos, NatTy) (CNat c)
 valToTTerm (VClos (ClosFun info p x ty tm)) = substN (map valToTTerm p) $ Lam info x ty (Sc1 tm)
