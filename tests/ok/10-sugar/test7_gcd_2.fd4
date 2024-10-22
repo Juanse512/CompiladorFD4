@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+type N = Nat
+
+>>>>>>> 2b78dd8f7301b4bff8954b4ef5cba4cca1c1c6e0
 let rec gcd(n m : Nat):Nat =  ifz n then m else 
                             ifz m then n else 
                             ifz (n - m) then gcd (m - n) n else gcd m (n - m)
