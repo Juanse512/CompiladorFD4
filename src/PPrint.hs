@@ -88,7 +88,6 @@ openAll gp ns (IfZ p c t e) = SIfZ (gp p) (openAll gp ns c) (openAll gp ns t) (o
 openAll gp ns (Print p str t) = SPrint (gp p) str (openAll gp ns t)
 openAll gp ns (BinaryOp p op t u) = SBinaryOp (gp p) op (openAll gp ns t) (openAll gp ns u)
 
--- SLet pos LetType [(Name, Ty)] STerm STerm
 
 openAll gp ns (Let p v ty m n) =
     let v'= freshen ns v

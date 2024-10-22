@@ -81,6 +81,15 @@ subst2 n1 n2 (Sc2 m) = varChanger (\_ p n -> V p (Free n)) bnd m
              | i == depth+1 = n1
              | otherwise  = abort "substN: M is not LC"
 
+substN :: [Tm info Var] -> Tm info Var -> Tm info Var
+substN ns = varChanger (\_ p n -> V p (Free n)) bnd
+   where bnd depth p i
+             | i <  depth = V p (Bound i)
+             | i >= depth && i < depth + nns
+                = ns !! (i - depth)
+             | otherwise = abort "substN: M is not LC"
+         nns = length ns
+
 -- `close n t` es la operación inversa a open. Reemplaza
 -- las variables `Free n` por la variable ligada `Bound 0`.
 close :: Name -> Tm info Var -> Scope info Var

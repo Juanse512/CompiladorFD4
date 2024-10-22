@@ -26,7 +26,6 @@ getVarsTypes :: [(Name, STy)] -> STy -> STy
 getVarsTypes [] tyf = STy "Nat" -- 
 getVarsTypes [(v,ty)] tyf = SFunTy ty tyf
 getVarsTypes ((v,ty):vs) tyf = SFunTy ty (getVarsTypes vs tyf)
--- getVarsTypes ((v,ty):vs) tyf = SFunTy (getVarsTypes vs tyf) ty 
 
 
 -- | 'elab' transforma variables ligadas en índices de de Bruijn
@@ -65,7 +64,7 @@ elab' env (SFix p (f,fsty) [(x,xsty)] st) = do t <- elab' (x:f:env) st
                                                fty <- elabTy fsty
                                                return $ Fix p f fty x xty (close2 f x t)
 elab' env (SFix p (f,fsty) vars st) = do let (x,xsty) = head vars
-                                         t <- elab' (x:f:env) (SFix p (f,fsty) (tail vars) st)
+                                         t <- elab' (x:f:env) (SLam p (tail vars) st)
                                          xty <- elabTy xsty
                                          fty <- elabTy fsty
                                          return $ Fix p f fty x xty (close2 f x t)
@@ -97,9 +96,6 @@ elab' env (SLet p LFun vars sdef sbody) = do let (v,svty) = head vars
                                              def <- elab' env (SLam p (tail vars) sdef)
                                              body <- elab' (v:env) sbody
                                              return $ Let p v tyf def (close v body)
-  -- let (v,vty) = head vars
-  -- in Let p v (getVarsTypes (tail vars) vty) (elab' env (SLam p (tail vars) def)) (close v (elab' (v:env) body))
-
 
 elab' env (SLet p LRec vars sdef sbody) = do let (v,svty) = head vars
                                              let styf = getVarsTypes (tail vars) svty
@@ -109,18 +105,13 @@ elab' env (SLet p LRec vars sdef sbody) = do let (v,svty) = head vars
                                              return $ Let p v tyf def (close v body)
 
 elabDecl :: MonadFD4 m => SDecl STerm -> m (Decl Term)
--- elabDecl (SDecl p vars LVar t) = let (v,ty) = head vars
---                                  in Decl p v (elab t)
 elabDecl (SDecl p vars LVar st) = do let (v,ty) = head vars
                                      t <- elab st
                                      return $ Decl p v t
 
-
 elabDecl (SDecl p vars LFun t) = do let (v,ty) = head vars
                                     elb <- elab (SLam p (tail vars) t)
                                     return $ Decl p v elb
--- elabDecl (SDecl p vars LFun t) = let (v,ty) = head vars
---                                  in Decl p v (elab (SLam p (tail vars) t))
 
 elabDecl (SDecl p vars LRec t) = do let (v,ty) = head vars
                                     let tyf = getVarsTypes (tail vars) ty
