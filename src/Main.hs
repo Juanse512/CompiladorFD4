@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-|
 Module      : Main
@@ -21,10 +22,10 @@ import Data.Char ( isSpace )
 import Control.Exception ( catch , IOException )
 import System.IO ( hPrint, stderr, hPutStrLn )
 import Data.Maybe ( fromMaybe )
-
+import System.FilePath (replaceExtension)
 import System.Exit ( exitWith, ExitCode(ExitFailure) )
 import Options.Applicative
-
+-- import Debug.Trace
 import Global
 import Errors
 import Lang
@@ -35,7 +36,7 @@ import PPrint ( pp , ppTy, ppDecl )
 import MonadFD4
 import CEK ( evalCEK )
 import TypeChecker ( tc, tcDecl )
-
+import Bytecompile (Bytecode, runBC, bcWrite, bcRead, bytecompileModule, showBC)
 prompt :: String
 prompt = "FD4> "
 
@@ -49,6 +50,8 @@ parseMode = (,) <$>
       <|> flag Eval        Eval        (long "eval" <> short 'e' <> help "Evaluar programa")
       <|> flag InteractiveCEK   InteractiveCEK  (long "interactiveCEK" <> short 'k' <> help "Evaluar programa con la máquina CEK")
       <|> flag CEK   CEK  (long "cek" <> short 'c' <> help "Evaluar programa con la máquina CEK")
+      <|> flag ByteCompile ByteCompile (long "bytecompile" <> short 'm' <> help "Compilar a bytecode")
+      <|> flag ByteRun ByteRun (long "runVM" <> short 'r' <> help "Correr bytecode")
       )
    <*> pure False
 
@@ -115,10 +118,39 @@ compileFile f = do
     i <- getInter
     setInter False
     when i $ printFD4 ("Abriendo "++f++"...")
-    decls <- loadFile f
-    mapM_ handleDecl decls
-    setInter i
+    m <- getMode
+    case m of
+      ByteCompile -> do
+          decls <- loadFile f
+          -- td <- typecheckDecl decls
+          types <- filterM (\case
+                              Right _ -> return True
+                              Left _ -> return False) decls
+          
+          mapM_ handleDecl types
+          
+          declsR <- filterM (\case
+                              Right _ -> return False
+                              Left _ -> return True) decls
 
+          d <- mapM (\case
+                      Left d -> do d' <- typecheckDecl d
+                                   addDecl d'
+                                   return d'
+                      Right d -> failFD4 "Type in decl") declsR
+          bc <- bytecompileModule d
+          liftIO $ bcWrite bc (replaceExtension f "bc32")
+      ByteRun -> do
+          bytecode <- liftIO $ bcRead f
+          runBC bytecode
+      _ -> do 
+          decls <- loadFile f
+          mapM_ handleDecl decls
+          setInter i
+  where
+        typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
+        typecheckDecl sdecl = do decl <- elabDecl sdecl
+                                 tcDecl decl
 parseIO ::  MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
@@ -162,7 +194,6 @@ handleDecl (Left d) = do
               (Decl p x tt) <- typecheckDecl d
               te <- evalCEK tt
               addDecl (Decl p x te)
-
       where
         typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
         typecheckDecl sdecl = do decl <- elabDecl sdecl

@@ -34,6 +34,9 @@ data Mode =
   | Eval
   | InteractiveCEK
   | CEK
+  | ByteCompile
+  | ByteRun
+  
 data Conf = Conf {
     opt :: Bool,          --  ^ True, si estan habilitadas las optimizaciones.
     modo :: Mode
