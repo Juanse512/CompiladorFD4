@@ -37,6 +37,7 @@ import MonadFD4
 import CEK ( evalCEK )
 import TypeChecker ( tc, tcDecl )
 import Bytecompile (Bytecode, runBC, bcWrite, bcRead, bytecompileModule, showBC)
+import Data.Either (partitionEithers)
 prompt :: String
 prompt = "FD4> "
 
@@ -113,6 +114,10 @@ loadFile f = do
     setLastFile filename
     parseIO filename program x
 
+typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
+typecheckDecl sdecl = do decl <- elabDecl sdecl
+                         tcDecl decl
+
 compileFile ::  MonadFD4 m => FilePath -> m ()
 compileFile f = do
     i <- getInter
@@ -122,22 +127,14 @@ compileFile f = do
     case m of
       ByteCompile -> do
           decls <- loadFile f
-          -- td <- typecheckDecl decls
-          types <- filterM (\case
-                              Right _ -> return True
-                              Left _ -> return False) decls
+          let (declsR, types) = partitionEithers decls
           
-          mapM_ handleDecl types
+          mapM_ handleDecl (map Right types)
           
-          declsR <- filterM (\case
-                              Right _ -> return False
-                              Left _ -> return True) decls
-
-          d <- mapM (\case
-                      Left d -> do d' <- typecheckDecl d
-                                   addDecl d'
-                                   return d'
-                      Right d -> failFD4 "Type in decl") declsR
+          d <- mapM (\d -> do
+                d' <- typecheckDecl d
+                addDecl d'
+                return d') declsR
           bc <- bytecompileModule d
           liftIO $ bcWrite bc (replaceExtension f "bc32")
       ByteRun -> do
@@ -147,10 +144,7 @@ compileFile f = do
           decls <- loadFile f
           mapM_ handleDecl decls
           setInter i
-  where
-        typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
-        typecheckDecl sdecl = do decl <- elabDecl sdecl
-                                 tcDecl decl
+        
 parseIO ::  MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
@@ -194,10 +188,7 @@ handleDecl (Left d) = do
               (Decl p x tt) <- typecheckDecl d
               te <- evalCEK tt
               addDecl (Decl p x te)
-      where
-        typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
-        typecheckDecl sdecl = do decl <- elabDecl sdecl
-                                 tcDecl decl
+              
 handleDecl (Right d) = do
         m <- getMode
         let p = declPos d
@@ -205,16 +196,7 @@ handleDecl (Right d) = do
         let sty = declBody d
         ty <- elabTy sty
         addType (Decl p n ty)
-        -- case m of
-        --   Interactive -> do
-        --       addType (Decl p n ty)
-        --   Typecheck -> do
-        --       f <- getLastFile
-        --       printFD4 ("Chequeando tipos de "++f)
-        --       addType (Decl p n ty)
-        --   Eval -> do
-        --       addType (Decl p n ty)
-
+        
 data Command = Compile CompileForm
              | PPrint String
              | Type String
