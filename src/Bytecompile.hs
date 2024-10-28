@@ -86,17 +86,16 @@ showOps (CONST:i:xs)     = ("CONST " ++  show i) : showOps xs
 showOps (ACCESS:i:xs)    = ("ACCESS " ++ show i) : showOps xs
 showOps (FUNCTION:i:xs)  = ("FUNCTION len=" ++ show i) : showOps xs
 showOps (CALL:xs)        = "CALL" : showOps xs
-showOps (ADD:xs)         = "ADD" : showOps xs
-showOps (SUB:xs)         = "SUB" : showOps xs
-showOps (FIX:i:xs)         = ("FIX len=" ++ show i) : showOps xs
+showOps (ADD:i:is:xs)    = ("ADD " ++ show i ++ "+" ++ show is) : showOps xs
+showOps (SUB:i:is:xs)    = ("SUB " ++ show i ++ "+" ++ show is) : showOps xs
+showOps (FIX:i:xs)       = ("FIX len=" ++ show i) : showOps xs
 showOps (STOP:xs)        = "STOP" : showOps xs
-showOps (JUMP:i:j:xs)      = ("JUMP len1=" ++ show i ++ " len2=" ++ show j) : showOps xs
+showOps (JUMP:i:j:xs)    = ("JUMP len1=" ++ show i ++ " len2=" ++ show j) : showOps xs
 showOps (SHIFT:xs)       = "SHIFT" : showOps xs
 showOps (DROP:xs)        = "DROP" : showOps xs
 showOps (PRINT:xs)       = let (msg,_:rest) = span (/=NULL) xs
                            in ("PRINT " ++ show (bc2string msg)) : showOps rest
 showOps (PRINTN:xs)      = "PRINTN" : showOps xs
-showOps (ADD:xs)         = "ADD" : showOps xs
 showOps (x:xs)           = show x : showOps xs
 
 showBC :: Bytecode -> String
@@ -138,22 +137,6 @@ bcc (IfZ _ c t1 t2) = do
   bc3 <- bcc t2
   return $ bc1 ++ [JUMP] ++ [(length bc2)] ++ [(length bc3)] ++ bc2 ++ bc3
 
--- bcc t = failFD4 "implementame!"
-
--- declGlobalToFree :: Decl TTerm -> Decl TTerm
--- declGlobalToFree (Decl p n (V p' (Global i))) = Decl p n (V p' (Free i))
--- declGlobalToFree (Decl p n (V p' x)) = Decl p n (V p' x)
--- declGlobalToFree (Decl p n (App p' t u)) = Decl p n (App p' (globalToFree t) (globalToFree u))
--- declGlobalToFree (Decl p n (Lam p' n' t (Sc1 b))) = Decl p n (Lam p' n' t (Sc1 (globalToFree b)))
--- declGlobalToFree (Decl p n (Let p' n' ty t (Sc1 b))) = Decl p n (Let p' n' ty (globalToFree t) (Sc1 (globalToFree b)))
--- declGlobalToFree (Decl p n (Fix p' f x t1 t2 (Sc2 b))) = Decl p n (Fix p' f x t1 t2 (Sc2 (globalToFree b)))
--- declGlobalToFree (Decl p n (IfZ p' c t1 t2)) = Decl p n (IfZ p' (globalToFree c) (globalToFree t1) (globalToFree t2))
--- declGlobalToFree (Decl p n (Print p' s t)) = Decl p n (Print p' s (globalToFree t))
--- declGlobalToFree (Decl p n (BinaryOp p' op t u)) = Decl p n (BinaryOp p' op (globalToFree t) (globalToFree u))
--- declGlobalToFree (Decl p n (Const p' c)) = Decl p n (Const p' c)
-
-
-
 globalToFree :: TTerm -> TTerm
 globalToFree (V p (Global i)) = (V p (Free i))
 globalToFree (V p x) = (V p x)
@@ -181,13 +164,9 @@ toLet ((Decl p n t):ds) = Let (p, getTy t) n (getTy t) t (close n $ toLet ds)
 
 bytecompileModule :: MonadFD4 m => Module -> m Bytecode
 bytecompileModule m = do
-  -- trace ("Bytecompiling: " ++ show m) $ return ()
   let m' = map (fmap globalToFree) m
   let m'' = toLet m'
-  -- trace ("Bytecompiling1: " ++ show m'') $ return ()
   bc <- bcc m''
-  -- trace ("Bytecompiling2: " ++ showBC bc) $ return ()
-  -- trace ("Bytecompiling3: " ++ show bc) $ return ()
   return $ bc ++ [STOP]
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo
@@ -215,8 +194,6 @@ runBC' (RETURN:_) _ (v:(RA e c):s) = runBC' c e (v:s)
 runBC' (SHIFT:c) e (v:s) = runBC' c (v:e) s
 runBC' (DROP:c) (v:e) s = runBC' c e s
 runBC' (PRINTN : c) e s@(I n : _) = printFD4 (show n) >> runBC' c e s
--- runBC' (PRINT : c) e s = let (msg , rest) = span (/=NULL) c
---                                in printFD4NNL (bc2string msg) >> runBC' (tail rest) e s
 runBC' (PRINT : cs) env stack = do
   cs' <- go cs
   runBC' cs' env stack
@@ -229,13 +206,9 @@ runBC' (JUMP : l1 : l2 : c) e ((I 0):s) = do
                                             let tk = take l1 c
                                             runBC' (tk++c') e s
 runBC' (JUMP : l1 : l2 : c) e ((I _):s) = runBC' (drop l1 c) e s 
-
-runBC' [STOP] _ s = return ()
-                       
+runBC' [STOP] _ s = return ()                     
 runBC' [] _ _ = return ()
--- -- runBC' x c e = trace ("Bytecompiling: " ++ showBC x) $ failFD4 "implementame!" 
 
 
--- else runBC' (drop l1 c) e (tail s)
 runBC :: MonadFD4 m => Bytecode -> m ()
 runBC bs = runBC' bs [] []
